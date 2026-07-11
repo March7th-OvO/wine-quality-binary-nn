@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Wine, Activity, Layers, ActivitySquare, BarChart3, RefreshCw, Zap, Lightbulb } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
+import { Activity, Layers, ActivitySquare, BarChart3, RefreshCw, Lightbulb } from 'lucide-react';
+import {
+  PolarAngleAxis,
+  PolarGrid,
+  PolarRadiusAxis,
+  Radar,
+  RadarChart,
+  ResponsiveContainer,
+  Tooltip,
+} from 'recharts';
 import Markdown from 'react-markdown';
 import type { WineFeatures, PredictionResult, ModelMetrics } from './types';
 import { cn } from './lib/utils';
@@ -36,17 +44,17 @@ const DEFAULT_POOR_WINE: WineFeatures = {
 };
 
 const FEATURE_META = [
-  { key: 'alcohol', label: '酒精度 (%)', min: 8, max: 15, step: 0.1 },
-  { key: 'volatile_acidity', label: '挥发性酸度', min: 0.1, max: 1.6, step: 0.01 },
-  { key: 'sulphates', label: '硫酸盐', min: 0.3, max: 2.0, step: 0.01 },
-  { key: 'fixed_acidity', label: '固定酸度', min: 4, max: 16, step: 0.1 },
-  { key: 'citric_acid', label: '柠檬酸', min: 0, max: 1, step: 0.01 },
-  { key: 'residual_sugar', label: '残糖', min: 1, max: 15, step: 0.1 },
-  { key: 'chlorides', label: '氯化物', min: 0.01, max: 0.6, step: 0.001 },
-  { key: 'density', label: '密度', min: 0.99, max: 1.004, step: 0.0001 },
-  { key: 'pH', label: 'pH', min: 2.7, max: 4.0, step: 0.01 },
-  { key: 'free_sulfur_dioxide', label: '游离二氧化硫', min: 1, max: 72, step: 1 },
-  { key: 'total_sulfur_dioxide', label: '总二氧化硫', min: 6, max: 289, step: 1 },
+  { key: 'alcohol', label: '酒精度 (%)', radarLabel: '酒精', min: 8, max: 15, step: 0.1 },
+  { key: 'volatile_acidity', label: '挥发性酸度', radarLabel: '挥发酸', min: 0.1, max: 1.6, step: 0.01 },
+  { key: 'sulphates', label: '硫酸盐', radarLabel: '硫酸盐', min: 0.3, max: 2.0, step: 0.01 },
+  { key: 'fixed_acidity', label: '固定酸度', radarLabel: '固定酸', min: 4, max: 16, step: 0.1 },
+  { key: 'citric_acid', label: '柠檬酸', radarLabel: '柠檬酸', min: 0, max: 1, step: 0.01 },
+  { key: 'residual_sugar', label: '残糖', radarLabel: '残糖', min: 1, max: 15, step: 0.1 },
+  { key: 'chlorides', label: '氯化物', radarLabel: '氯化物', min: 0.01, max: 0.6, step: 0.001 },
+  { key: 'density', label: '密度', radarLabel: '密度', min: 0.99, max: 1.004, step: 0.0001 },
+  { key: 'pH', label: 'pH', radarLabel: 'pH', min: 2.7, max: 4.0, step: 0.01 },
+  { key: 'free_sulfur_dioxide', label: '游离二氧化硫', radarLabel: '游离 SO₂', min: 1, max: 72, step: 1 },
+  { key: 'total_sulfur_dioxide', label: '总二氧化硫', radarLabel: '总 SO₂', min: 6, max: 289, step: 1 },
 ] as const;
 
 export default function App() {
@@ -56,10 +64,22 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [expertOpinion, setExpertOpinion] = useState<string | null>(null);
   const [loadingOpinion, setLoadingOpinion] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const physicochemicalRadarData = FEATURE_META.map((feature) => ({
+    name: feature.radarLabel,
+    rawValue: features[feature.key],
+    // 不同量纲先映射到各自合理范围的 0–100%，才能在同一雷达图中比较。
+    value: Math.min(100, Math.max(0,
+      ((features[feature.key] - feature.min) / (feature.max - feature.min)) * 100
+    )),
+  }));
 
   useEffect(() => {
     fetch('/api/metrics')
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`指标加载失败（HTTP ${res.status}）`);
+        return res.json();
+      })
       .then(data => setMetrics(data))
       .catch(err => console.error("Could not load metrics", err));
   }, []);
@@ -68,6 +88,7 @@ export default function App() {
     setLoading(true);
     setPrediction(null);
     setExpertOpinion(null);
+    setError(null);
     try {
       const res = await fetch('/api/predict', {
         method: 'POST',
@@ -75,9 +96,13 @@ export default function App() {
         body: JSON.stringify(features),
       });
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || data.error || `预测失败（HTTP ${res.status}）`);
+      }
       setPrediction(data);
     } catch (error) {
       console.error(error);
+      setError(error instanceof Error ? error.message : '预测请求失败，请稍后重试。');
     } finally {
       setLoading(false);
     }
@@ -94,9 +119,13 @@ export default function App() {
         body: JSON.stringify({ features, prediction }),
       });
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || data.error || `品鉴请求失败（HTTP ${res.status}）`);
+      }
       setExpertOpinion(data.opinion);
     } catch (error) {
       console.error(error);
+      setError(error instanceof Error ? error.message : '品鉴请求失败，请稍后重试。');
     } finally {
       setLoadingOpinion(false);
     }
@@ -137,32 +166,45 @@ export default function App() {
             <MetricCard title="AUC" value={metrics?.auc} icon={<BarChart3 size={14} />} delay={0.4} />
           </div>
 
-          <div className="bg-[#141414] border border-white/5 p-4 sm:p-6 rounded-xl h-[300px] mt-2 shadow-xl shadow-black/20 hidden lg:block">
-            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-6">指标概览</h3>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={
+          <div className="bg-[#141414] border border-white/5 p-5 rounded-xl h-[320px] mt-2 shadow-xl shadow-black/20 hidden lg:block overflow-hidden">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">指标分布雷达图</h3>
+              <span className="text-[9px] font-mono text-red-500/70">TEST SET</span>
+            </div>
+            <div className="h-[258px] -mx-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart outerRadius="68%" data={
                 metrics ? [
                   { name: '准确率', value: metrics.accuracy * 100 },
                   { name: '精确率', value: metrics.precision * 100 },
                   { name: '召回率', value: metrics.recall * 100 },
-                  { name: 'F1', value: metrics.f1_score * 100 }
+                  { name: 'F1', value: metrics.f1_score * 100 },
+                  { name: 'AUC', value: metrics.auc * 100 },
                 ] : []
               }>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} domain={[0, 100]} />
+                <PolarGrid gridType="polygon" stroke="rgba(255,255,255,0.12)" />
+                <PolarAngleAxis
+                  dataKey="name"
+                  tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                />
+                <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
                 <Tooltip
-                  cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                   contentStyle={{ backgroundColor: '#141414', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.3)', color: '#fff' }}
                   itemStyle={{ color: '#fff' }}
+                  formatter={(value) => [`${Number(value).toFixed(1)}%`, '得分']}
                 />
-                <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                  {metrics && ['准确率', '精确率', '召回率', 'F1'].map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={index === 0 ? '#b91c1c' : '#991b1b'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+                <Radar
+                  name="模型指标"
+                  dataKey="value"
+                  stroke="#ef4444"
+                  strokeWidth={2}
+                  fill="#991b1b"
+                  fillOpacity={0.38}
+                  dot={{ r: 3, fill: '#fca5a5', stroke: '#7f1d1d', strokeWidth: 1 }}
+                />
+                </RadarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
           <div className="mt-4 lg:mt-auto hidden lg:block">
@@ -271,6 +313,9 @@ export default function App() {
                 )}
               </button>
             </div>
+            {error && (
+              <p role="alert" className="mt-4 text-center text-sm text-red-400">{error}</p>
+            )}
           </div>
 
           {/* Results */}
@@ -278,12 +323,13 @@ export default function App() {
             <AnimatePresence mode="wait">
               {prediction ? (
                 <div key="result-container" className="space-y-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
                   className={cn(
-                    "flex flex-col md:flex-row items-center border relative overflow-hidden gap-10 p-8 rounded-2xl",
+                    "flex flex-col items-center border relative overflow-hidden gap-8 p-8 rounded-2xl min-h-[340px] h-full",
                     prediction.label === 1
                       ? "bg-gradient-to-r from-red-950 via-[#1a0606] to-[#0f0f0f] border-red-900/30 shadow-xl shadow-red-900/20"
                       : "bg-[#141414] border-white/5"
@@ -334,6 +380,48 @@ export default function App() {
                     </div>
                   )}
                 </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ delay: 0.08 }}
+                  className="bg-[#141414] border border-white/5 rounded-2xl p-5 min-h-[340px] h-full overflow-hidden"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-red-500">样本画像</span>
+                      <h3 className="text-lg font-medium text-slate-200 mt-1">理化参数雷达图</h3>
+                    </div>
+                    <span className="text-[9px] font-mono text-slate-600">NORMALIZED</span>
+                  </div>
+                  <div className="h-[265px] -mx-3 -mb-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadarChart outerRadius="67%" data={physicochemicalRadarData}>
+                        <PolarGrid gridType="polygon" stroke="rgba(255,255,255,0.12)" />
+                        <PolarAngleAxis
+                          dataKey="name"
+                          tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 600 }}
+                        />
+                        <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: '#141414', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
+                          formatter={(_value, _name, item) => [Number(item.payload.rawValue).toFixed(4).replace(/\.?0+$/, ''), '原始值']}
+                        />
+                        <Radar
+                          name="理化参数"
+                          dataKey="value"
+                          stroke="#ef4444"
+                          strokeWidth={2}
+                          fill="#991b1b"
+                          fillOpacity={0.38}
+                          dot={{ r: 2.5, fill: '#fca5a5', stroke: '#7f1d1d', strokeWidth: 1 }}
+                        />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </motion.div>
+                </div>
 
                 {/* AI Sommelier Opinion Section */}
                 <motion.div

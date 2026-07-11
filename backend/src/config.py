@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -16,3 +15,6 @@ BATCH_SIZE = 32
 LEARNING_RATE = 0.001
 EPOCHS = 100
 THRESHOLD = 6  # wine quality >= 6 is 1, else 0
+RANDOM_SEED = 42
+TEST_SIZE = 0.2
+VALIDATION_SIZE = 0.2

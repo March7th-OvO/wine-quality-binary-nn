@@ -7,7 +7,7 @@
 **主要功能**
 - PyTorch 神经网络：二分类预测红酒品质
 - React 控制面板：滑块调节 11 项理化指标，实时查看预测结果
-- 数据可视化：指标分布雷达图与预测置信度展示
+- 数据可视化：模型指标分布雷达图与预测置信度展示
 - AI 品鉴：通过 DeepSeek API 自动生成品鉴评语
 
 **技术栈**
@@ -56,7 +56,7 @@ pip install -r requirements.txt
 python -m src.train
 
 # 启动 FastAPI 服务 (port 8000)
-uvicorn src.main:app --host 0.0.0.0 --port 8000
+python -m uvicorn src.main:app --host 0.0.0.0 --port 8000
 ```
 
 **2. 前端 (Node.js)**
