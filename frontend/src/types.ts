@@ -15,7 +15,6 @@ export interface WineFeatures {
 export interface PredictionResult {
   label: number;
   probability: number;
-  error?: string;
 }
 
 export interface ModelMetrics {
@@ -24,4 +23,6 @@ export interface ModelMetrics {
   recall: number;
   f1_score: number;
   auc: number;
+  best_epoch?: number;
+  evaluation_split?: string;
 }
