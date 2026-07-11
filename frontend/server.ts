@@ -53,15 +53,14 @@ app.post("/api/expert", async (req, res) => {
     }
 
     const { features, prediction } = req.body;
-    const prompt = `You are an expert AI sommelier.
-Based on the following chemical profile of a Red Wine and the machine learning model's prediction, provide a brief, professional opinion on the wine's taste, structure, and food pairing recommendations.
+    const systemPrompt = `You are an expert AI sommelier with deep knowledge of wine chemistry, sensory evaluation, and food pairing. Based on the user-provided chemical profile of a red wine and a machine learning model's prediction, give a brief, professional opinion on the wine's taste, structure, and food pairing recommendations.
 
-Chemical Profile:
+Always respond in Chinese, keeping it engaging and elegant. Reference the model's high or low confidence if applicable, and point out specific features (like high alcohol, ideal pH, balanced acidity, etc.). Keep it concise, around 3-4 sentences.`;
+
+    const userPrompt = `Chemical Profile:
 ${JSON.stringify(features, null, 2)}
 
-Model Prediction: ${prediction.label === 1 ? "Premium Wine" : "Standard Wine"} (Confidence: ${(prediction.probability * 100).toFixed(1)}%)
-
-Respond in Chinese, keeping it engaging and elegant. Specifically, reference the model's high or low confidence if applicable, and point out specific features (like high alcohol, ideal pH, balanced acidity, etc.). Keep it concise, around 3-4 sentences.`;
+Model Prediction: ${prediction.label === 1 ? "Premium Wine" : "Standard Wine"} (Confidence: ${(prediction.probability * 100).toFixed(1)}%)`;
 
     const response = await fetch(`${DEEPSEEK_BASE_URL}/v1/chat/completions`, {
       method: "POST",
@@ -72,7 +71,8 @@ Respond in Chinese, keeping it engaging and elegant. Specifically, reference the
       body: JSON.stringify({
         model: DEEPSEEK_MODEL,
         messages: [
-          { role: "user", content: prompt },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
         ],
       }),
     });

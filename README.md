@@ -1,6 +1,20 @@
 # Vinum AI - Wine Quality Predictor
 
-基于 PyTorch 神经网络的红酒品质二分类预测器，搭配 React 控制面板与 AI 侍酒师品鉴意见。
+## 项目简介
+
+本项目为红酒品质二分类预测器，基于 PyTorch 神经网络，输入红酒的 11 项理化指标（酸度、糖分、酒精度、pH 值等）进行品质预测。前端使用 React 搭建交互式控制面板，通过滑块调节各项指标参数；后端使用 FastAPI 提供推理接口；并接入 DeepSeek API，根据预测结果生成 AI 品鉴意见。
+
+**主要功能**
+- PyTorch 神经网络：二分类预测红酒品质
+- React 控制面板：滑块调节 11 项理化指标，实时查看预测结果
+- 数据可视化：指标分布雷达图与预测置信度展示
+- AI 品鉴：通过 DeepSeek API 自动生成品鉴评语
+
+**技术栈**
+- 前端：React 19 + Tailwind CSS 4 + Recharts + Radix UI
+- 后端：FastAPI + PyTorch + scikit-learn
+- AI：DeepSeek API（OpenAI 兼容格式）
+- 中间层：Express（TypeScript）+ Vite
 
 ## 项目结构
 
@@ -64,3 +78,7 @@ npm run dev                  # 启动开发服务器 (port 3000)
 | 中间层 | Express (TypeScript), Vite |
 | ML 后端 | PyTorch, FastAPI, scikit-learn |
 | AI 品鉴 | DeepSeek API (OpenAI 兼容) |
+
+## 📄 许可
+
+本项目基于 [MIT License](LICENSE) 开源。
